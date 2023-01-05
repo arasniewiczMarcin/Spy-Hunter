@@ -2,88 +2,10 @@
 #include<math.h>
 #include<stdio.h>
 #include<string.h>
-
-extern "C" {
-#include"./SDL2-2.0.10/include/SDL.h"
-#include"./SDL2-2.0.10/include/SDL_main.h"
-}
-
-#define SCREEN_WIDTH	1280
-#define SCREEN_HEIGHT	720
-#define NAME_X_POSITION	10
-#define NAME_Y_POSITION	10
-#define POINTS_Y_POSITION 26
+#include"drawing.h"
 
 
-// narysowanie napisu txt na powierzchni screen, zaczynajπc od punktu (x, y)
-// charset to bitmapa 128x128 zawierajπca znaki
-// draw a text txt on surface screen, starting from the point (x, y)
-// charset is a 128x128 bitmap containing character images
-void DrawString(SDL_Surface *screen, int x, int y, const char *text,
-                SDL_Surface *charset) {
-	int px, py, c;
-	SDL_Rect s, d;
-	s.w = 8;
-	s.h = 8;
-	d.w = 8;
-	d.h = 8;
-	while(*text) {
-		c = *text & 255;
-		px = (c % 16) * 8;
-		py = (c / 16) * 8;
-		s.x = px;
-		s.y = py;
-		d.x = x;
-		d.y = y;
-		SDL_BlitSurface(charset, &s, screen, &d);
-		x += 8;
-		text++;
-		};
-	};
 
-
-// narysowanie na ekranie screen powierzchni sprite w punkcie (x, y)
-// (x, y) to punkt úrodka obrazka sprite na ekranie
-void DrawSurface(SDL_Surface *screen, SDL_Surface *sprite, int x, int y) {
-	SDL_Rect dest;
-	dest.x = x - sprite->w / 2;
-	dest.y = y - sprite->h / 2;
-	dest.w = sprite->w;
-	dest.h = sprite->h;
-	SDL_BlitSurface(sprite, NULL, screen, &dest);
-	};
-
-
-// rysowanie pojedynczego pixela
-void DrawPixel(SDL_Surface *surface, int x, int y, Uint32 color) {
-	int bpp = surface->format->BytesPerPixel;
-	Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
-	*(Uint32 *)p = color;
-	};
-
-
-// rysowanie linii o d≥ugoúci l w pionie (gdy dx = 0, dy = 1) 
-// bπdü poziomie (gdy dx = 1, dy = 0)
-void DrawLine(SDL_Surface *screen, int x, int y, int l, int dx, int dy, Uint32 color) {
-	for(int i = 0; i < l; i++) {
-		DrawPixel(screen, x, y, color);
-		x += dx;
-		y += dy;
-		};
-	};
-
-
-// rysowanie prostokπta o d≥ugoúci bokÛw l i k
-void DrawRectangle(SDL_Surface *screen, int x, int y, int l, int k,
-                   Uint32 outlineColor, Uint32 fillColor) {
-	int i;
-	DrawLine(screen, x, y, k, 0, 1, outlineColor);
-	DrawLine(screen, x + l - 1, y, k, 0, 1, outlineColor);
-	DrawLine(screen, x, y, l, 1, 0, outlineColor);
-	DrawLine(screen, x, y + k - 1, l, 1, 0, outlineColor);
-	for(i = y + 1; i < y + k - 1; i++)
-		DrawLine(screen, x + 1, i, l - 2, 1, 0, fillColor);
-	};
 
 
 // main
@@ -91,11 +13,11 @@ void DrawRectangle(SDL_Surface *screen, int x, int y, int l, int k,
 extern "C"
 #endif
 int main(int argc, char **argv) {
-	int t1, t2, quit, frames, rc, points = 0;
-	double delta, worldTime, fpsTimer, fps, distance, etiSpeed;
+	int t1, t2, quit, frames, rc, points = 0, xSpeed = 0, playerX = SCREEN_WIDTH / 1.2;
+	double delta, worldTime, fpsTimer, fps, distance, etiSpeed, speed = 0, roadLinesPosition[5] = { 100, 200, 300, 400, 500 }, metres = 0;
 	SDL_Event event;
 	SDL_Surface *screen, *charset;
-	SDL_Surface *eti, *road;
+	SDL_Surface *road, *player, *npc, *spy;
 	SDL_Texture *scrtex;
 	SDL_Window *window;
 	SDL_Renderer *renderer;
@@ -130,6 +52,8 @@ int main(int argc, char **argv) {
 	// wy≥πczenie widocznoúci kursora myszy
 	SDL_ShowCursor(SDL_DISABLE);
 
+
+
 	// wczytanie obrazka cs8x8.bmp
 	charset = SDL_LoadBMP("./cs8x8.bmp");
 	if(charset == NULL) {
@@ -146,7 +70,19 @@ int main(int argc, char **argv) {
 	road = SDL_LoadBMP("./road.bmp");
 	if (road == NULL) {
 		printf("SDL_LoadBMP(road.bmp) error: %s\n", SDL_GetError());
-		SDL_FreeSurface(charset);
+		SDL_FreeSurface(road);
+		SDL_FreeSurface(screen);
+		SDL_DestroyTexture(scrtex);
+		SDL_DestroyWindow(window);
+		SDL_DestroyRenderer(renderer);
+		SDL_Quit();
+		return 1;
+	};
+
+	player = SDL_LoadBMP("./hunter.bmp");
+	if (player == NULL) {
+		printf("SDL_LoadBMP(hunter.bmp) error: %s\n", SDL_GetError());
+		SDL_FreeSurface(player);
 		SDL_FreeSurface(screen);
 		SDL_DestroyTexture(scrtex);
 		SDL_DestroyWindow(window);
@@ -160,6 +96,8 @@ int main(int argc, char **argv) {
 	int zielony = SDL_MapRGB(screen->format, 0x00, 0xFF, 0x00);
 	int czerwony = SDL_MapRGB(screen->format, 0xFF, 0x00, 0x00);
 	int niebieski = SDL_MapRGB(screen->format, 0x11, 0x11, 0xCC);
+	int white = SDL_MapRGB(screen->format, 0xFF, 0xFF, 0xFF);
+	int gray = SDL_MapRGB(screen->format, 0x69, 0x69, 0x69);
 
 	t1 = SDL_GetTicks();
 
@@ -170,6 +108,7 @@ int main(int argc, char **argv) {
 	worldTime = 0;
 	distance = 0;
 	etiSpeed = 1;
+
 
 
 	while(!quit) {
@@ -183,18 +122,30 @@ int main(int argc, char **argv) {
 
 		worldTime += delta;
 
-		distance += etiSpeed * delta;
-
-		//SDL_FillRect(screen, NULL, czarny);
-
+		distance += speed * delta;
+		if (distance > 1) {
+			distance = 0;
+			points += 50;
+		}
+		//drawing road bmp
 		DrawSurface(screen, road, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+
+		//drawing road lines
+		for (int i = 0; i < 5; i++) {
+			roadLinesPosition[i] = getRoadLinesPosition(speed, i, roadLinesPosition[i], 50);
+		}
+		drawRoadlines(screen, SCREEN_WIDTH / 2, roadLinesPosition, 8, 50, gray);
+
+		//drawing player bmp
+		playerX += xSpeed;
+		DrawSurface(screen, player, playerX , SCREEN_HEIGHT / 1.5);
 
 		fpsTimer += delta;
 		if(fpsTimer > 0.5) {
 			fps = frames * 2;
 			frames = 0;
 			fpsTimer -= 0.5;
-			};
+		};
 
 	
 		sprintf_s(text, "Marcin Arasniewicz, 188857");
@@ -203,8 +154,11 @@ int main(int argc, char **argv) {
 		sprintf_s(text, "TIME: %.1lf s POINTS: %i", worldTime, points);
 		DrawString(screen, screen->w / 2 - strlen(text) * 8 / 2, POINTS_Y_POSITION, text, charset);
 
+		//zaimplementowane elementy
+		sprintf_s(text, "a, b, d, f");
+		DrawString(screen, SCREEN_WIDTH - 200, SCREEN_HEIGHT - 50, text, charset);
+
 		SDL_UpdateTexture(scrtex, NULL, screen->pixels, screen->pitch);
-//		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, scrtex, NULL, NULL);
 		SDL_RenderPresent(renderer);
 
@@ -213,11 +167,30 @@ int main(int argc, char **argv) {
 			switch(event.type) {
 				case SDL_KEYDOWN:
 					if(event.key.keysym.sym == SDLK_ESCAPE) quit = 1;
-					else if(event.key.keysym.sym == SDLK_UP) etiSpeed = 2.0;
-					else if(event.key.keysym.sym == SDLK_DOWN) etiSpeed = 0.3;
+					else if (event.key.keysym.sym == SDLK_UP && speed <= 1) speed += 0.2;
+					else if (event.key.keysym.sym == SDLK_DOWN && speed >= 0.1) {
+						speed -= 0.1;
+						if (speed < 0.05)speed = 0;
+					}
+					else if (event.key.keysym.sym == SDLK_LEFT) xSpeed = -1.0;
+					else if (event.key.keysym.sym == SDLK_RIGHT) xSpeed = 1.0;					
+					else if (event.key.keysym.sym == SDLK_n) {
+						speed = 0;
+						roadLinesPosition[0] = 100;
+						roadLinesPosition[1] = 200;
+						roadLinesPosition[2] = 300;
+						roadLinesPosition[3] = 400;
+						roadLinesPosition[4] = 500;
+						distance = 0;
+						points = 0;
+						metres = 0;
+						worldTime = 0;
+
+					}
 					break;
 				case SDL_KEYUP:
-					etiSpeed = 1.0;
+					if (event.key.keysym.sym == SDLK_LEFT && xSpeed == -1.0) xSpeed = 0;
+					else if (event.key.keysym.sym == SDLK_RIGHT && xSpeed == 1.0) xSpeed = 0;
 					break;
 				case SDL_QUIT:
 					quit = 1;
