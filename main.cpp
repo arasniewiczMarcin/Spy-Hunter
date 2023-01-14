@@ -3,32 +3,49 @@
 #include<stdio.h>
 #include<string.h>
 #include"drawing.h"
+#include"game.h"
 
 
-
-
-
-// main
 #ifdef __cplusplus
 extern "C"
 #endif
+
+
+struct colours {
+	int black;
+	int gray;
+};
+
+
 int main(int argc, char **argv) {
-	int t1, t2, quit, frames, rc, points = 0, xSpeed = 0, playerX = SCREEN_WIDTH / 1.2;
-	double delta, worldTime, fpsTimer, fps, distance, etiSpeed, speed = 0, roadLinesPosition[5] = { 100, 200, 300, 400, 500 }, metres = 0;
+	
+	double milestone = 1000;
+	double tmpTime = 0;
 	SDL_Event event;
 	SDL_Surface *screen, *charset;
-	SDL_Surface *road, *player, *npc, *spy;
+	SDL_Surface *road, *player, *npc, *spy, *tree, *boom, *fCar, *sCar, *eCar;
 	SDL_Texture *scrtex;
 	SDL_Window *window;
 	SDL_Renderer *renderer;
+
+	objects playerCar = {0, SCREEN_WIDTH / 1.2, 0};
+	timeMeasuring time = {};
+	colours color = {};
+	generally general = {};
+	objects trees = {0, MARGIN_WIDTH / 2, 0, 0};
+	objects friendlyCar[5] = {};
+	objects enemyCar[5] = {};
+	objects spyCar[5] = {};
+	
 
 	if(SDL_Init(SDL_INIT_EVERYTHING) != 0) {
 		printf("SDL_Init error: %s\n", SDL_GetError());
 		return 1;
 	}
-	rc = SDL_CreateWindowAndRenderer(SCREEN_WIDTH, SCREEN_HEIGHT, 0,
+
+	general.rc = SDL_CreateWindowAndRenderer(SCREEN_WIDTH, SCREEN_HEIGHT, 0,
 	                                 &window, &renderer);
-	if(rc != 0) {
+	if(general.rc != 0) {
 		SDL_Quit();
 		printf("SDL_CreateWindowAndRenderer error: %s\n", SDL_GetError());
 		return 1;
@@ -37,9 +54,8 @@ int main(int argc, char **argv) {
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
 	SDL_RenderSetLogicalSize(renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-
 	SDL_SetWindowTitle(window, "SpyHunter");
-
+	SDL_ShowCursor(SDL_DISABLE);
 
 	screen = SDL_CreateRGBSurface(0, SCREEN_WIDTH, SCREEN_HEIGHT, 32,
 	                              0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
@@ -48,165 +64,126 @@ int main(int argc, char **argv) {
 	                           SDL_TEXTUREACCESS_STREAMING,
 	                           SCREEN_WIDTH, SCREEN_HEIGHT);
 
-
-	// wy³¹czenie widocznoœci kursora myszy
-	SDL_ShowCursor(SDL_DISABLE);
-
-
-
-	// wczytanie obrazka cs8x8.bmp
+	//loading bitmaps
 	charset = SDL_LoadBMP("./cs8x8.bmp");
-	if(charset == NULL) {
-		printf("SDL_LoadBMP(cs8x8.bmp) error: %s\n", SDL_GetError());
-		SDL_FreeSurface(screen);
-		SDL_DestroyTexture(scrtex);
-		SDL_DestroyWindow(window);
-		SDL_DestroyRenderer(renderer);
-		SDL_Quit();
-		return 1;
-		};
-	SDL_SetColorKey(charset, true, 0x000000);
-
 	road = SDL_LoadBMP("./road.bmp");
-	if (road == NULL) {
-		printf("SDL_LoadBMP(road.bmp) error: %s\n", SDL_GetError());
-		SDL_FreeSurface(road);
-		SDL_FreeSurface(screen);
-		SDL_DestroyTexture(scrtex);
-		SDL_DestroyWindow(window);
-		SDL_DestroyRenderer(renderer);
-		SDL_Quit();
+	playerCar.surface = SDL_LoadBMP("./hunter.bmp");
+	for (int i = 0; i < 5; i++) {
+		friendlyCar[i].surface = SDL_LoadBMP("./npc.bmp");
+		spyCar[i].surface = SDL_LoadBMP("./spy.bmp");
+		enemyCar[i].surface = SDL_LoadBMP("./enemy.bmp");
+	}
+	fCar = SDL_LoadBMP("./npc.bmp");
+	eCar = SDL_LoadBMP("./enemy.bmp");
+	sCar = SDL_LoadBMP("./spy.bmp");
+	trees.surface = SDL_LoadBMP("./tree.bmp");
+	boom = SDL_LoadBMP("./blowup.bmp");
+
+	if (charset == NULL || road == NULL || playerCar.surface == NULL || friendlyCar[0].surface == NULL || enemyCar[0].surface == NULL ||
+		spyCar[0].surface == NULL|| trees.surface == NULL || boom == NULL) {
+		bmpError(screen, scrtex, window, renderer, charset, playerCar.surface, road, spyCar[0].surface, friendlyCar[0].surface, trees.surface);
 		return 1;
-	};
+	}
+	
+	SDL_SetColorKey(charset, true, 0x000000);
+	setColors(screen, color.black, color.gray);
 
-	player = SDL_LoadBMP("./hunter.bmp");
-	if (player == NULL) {
-		printf("SDL_LoadBMP(hunter.bmp) error: %s\n", SDL_GetError());
-		SDL_FreeSurface(player);
-		SDL_FreeSurface(screen);
-		SDL_DestroyTexture(scrtex);
-		SDL_DestroyWindow(window);
-		SDL_DestroyRenderer(renderer);
-		SDL_Quit();
-		return 1;
-	};
-
-	char text[128];
-	int czarny = SDL_MapRGB(screen->format, 0x00, 0x00, 0x00);
-	int zielony = SDL_MapRGB(screen->format, 0x00, 0xFF, 0x00);
-	int czerwony = SDL_MapRGB(screen->format, 0xFF, 0x00, 0x00);
-	int niebieski = SDL_MapRGB(screen->format, 0x11, 0x11, 0xCC);
-	int white = SDL_MapRGB(screen->format, 0xFF, 0xFF, 0xFF);
-	int gray = SDL_MapRGB(screen->format, 0x69, 0x69, 0x69);
-
-	t1 = SDL_GetTicks();
-
-	frames = 0;
-	fpsTimer = 0;
-	fps = 0;
-	quit = 0;
-	worldTime = 0;
-	distance = 0;
-	etiSpeed = 1;
+	newGame(playerCar, friendlyCar, spyCar, enemyCar, general.points, time, fCar, eCar, sCar);
 
 
+	while(!general.quit) {
+		
+		time.t2 = SDL_GetTicks();
+		time.delta = (time.t2 - time.t1) * 0.001;
+		time.t1 = time.t2;
+		time.worldTime += time.delta;
 
-	while(!quit) {
-		t2 = SDL_GetTicks();
-
-		// w tym momencie t2-t1 to czas w milisekundach,
-		// jaki uplyna³ od ostatniego narysowania ekranu
-		// delta to ten sam czas w sekundach
-		delta = (t2 - t1) * 0.001;
-		t1 = t2;
-
-		worldTime += delta;
-
-		distance += speed * delta;
-		if (distance > 1) {
-			distance = 0;
-			points += 50;
+		//holding points
+		if (milestone < 0) {
+			tmpTime += time.delta;
+			if (tmpTime >= 5) {
+				tmpTime = 0;
+				milestone = playerCar.distance + 1000;
+			}
 		}
+			
+		addDistanceAndPoints(playerCar, friendlyCar, spyCar, enemyCar, milestone, general.points, time.delta);
 		//drawing road bmp
 		DrawSurface(screen, road, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+		
+		showStats(screen, charset, playerCar.xSpeed, playerCar.xPosition, playerCar.speed, playerCar.distance, general.text);
 
-		//drawing road lines
-		for (int i = 0; i < 5; i++) {
-			roadLinesPosition[i] = getRoadLinesPosition(speed, i, roadLinesPosition[i], 50);
-		}
-		drawRoadlines(screen, SCREEN_WIDTH / 2, roadLinesPosition, 8, 50, gray);
+		//drawing trees
+		drawTrees(screen, trees.surface, trees.xPosition, playerCar.distance);
+
+		//drawing cars
+		drawFriendlyCars(screen, friendlyCar, playerCar.distance, time.t1, fCar);
+		drawSpyCars(screen, spyCar, playerCar.distance, time.t1, sCar);
+		drawEnemyCars(screen, enemyCar, playerCar.distance, time.t1, eCar);
 
 		//drawing player bmp
-		playerX += xSpeed;
-		DrawSurface(screen, player, playerX , SCREEN_HEIGHT / 1.5);
+		playerCar.xPosition += playerCar.xSpeed;
+		DrawSurface(screen, playerCar.surface, playerCar.xPosition, PLAYER_Y_POSITION);
 
-		fpsTimer += delta;
-		if(fpsTimer > 0.5) {
-			fps = frames * 2;
-			frames = 0;
-			fpsTimer -= 0.5;
-		};
+		attackPlayer(enemyCar, playerCar);
+		
+		checkColisions(friendlyCar, spyCar, enemyCar, playerCar, boom, screen, scrtex, renderer, time, general.points, milestone, fCar, eCar, sCar);
 
-	
-		sprintf_s(text, "Marcin Arasniewicz, 188857");
-		DrawString(screen, NAME_X_POSITION, NAME_Y_POSITION, text, charset); 
-		//	      "Esc - exit, \030 - faster, \031 - slower"
-		sprintf_s(text, "TIME: %.1lf s POINTS: %i", worldTime, points);
-		DrawString(screen, screen->w / 2 - strlen(text) * 8 / 2, POINTS_Y_POSITION, text, charset);
+		//sprawdzanko czy wypad³ z drogi
+		if (playerCar.xPosition > SCREEN_WIDTH - 100 || playerCar.xPosition < 100) {
+			blowUp(playerCar, friendlyCar, spyCar, enemyCar, time, general.points, playerCar, boom, screen, scrtex, renderer, fCar, eCar, sCar);
+		}
 
-		//zaimplementowane elementy
-		sprintf_s(text, "a, b, d, f");
-		DrawString(screen, SCREEN_WIDTH - 200, SCREEN_HEIGHT - 50, text, charset);
+		drawTexts(screen, scrtex, renderer, charset, time.worldTime, general.points, general.text);
 
-		SDL_UpdateTexture(scrtex, NULL, screen->pixels, screen->pitch);
-		SDL_RenderCopy(renderer, scrtex, NULL, NULL);
-		SDL_RenderPresent(renderer);
-
-		// obs³uga zdarzeñ (o ile jakieœ zasz³y) / handling of events (if there were any)
+		//handling of events
 		while(SDL_PollEvent(&event)) {
 			switch(event.type) {
 				case SDL_KEYDOWN:
-					if(event.key.keysym.sym == SDLK_ESCAPE) quit = 1;
-					else if (event.key.keysym.sym == SDLK_UP && speed <= 1) speed += 0.2;
-					else if (event.key.keysym.sym == SDLK_DOWN && speed >= 0.1) {
-						speed -= 0.1;
-						if (speed < 0.05)speed = 0;
-					}
-					else if (event.key.keysym.sym == SDLK_LEFT) xSpeed = -1.0;
-					else if (event.key.keysym.sym == SDLK_RIGHT) xSpeed = 1.0;					
-					else if (event.key.keysym.sym == SDLK_n) {
-						speed = 0;
-						roadLinesPosition[0] = 100;
-						roadLinesPosition[1] = 200;
-						roadLinesPosition[2] = 300;
-						roadLinesPosition[3] = 400;
-						roadLinesPosition[4] = 500;
-						distance = 0;
-						points = 0;
-						metres = 0;
-						worldTime = 0;
-
-					}
+					switch (event.key.keysym.sym) {
+						case SDLK_ESCAPE:
+							general.quit = 1;
+							break;
+						case SDLK_p:
+							pause(event, time.worldTime, playerCar, friendlyCar, spyCar, enemyCar);
+							break;
+						case SDLK_UP:
+							if(playerCar.speed < 1000)playerCar.speed += 100;
+							break;
+						case SDLK_DOWN:
+							if (playerCar.speed >= 100) {
+								playerCar.speed -= 100;
+								if (playerCar.speed < 0.05)playerCar.speed = 0;
+							}
+							break;
+						case SDLK_LEFT:
+							if(playerCar.speed != 0)playerCar.xSpeed = -1.0;
+							break;
+						case SDLK_RIGHT:
+							if(playerCar.speed != 0)playerCar.xSpeed = 1.0;
+							break;
+						case SDLK_n:
+							newGame(playerCar, friendlyCar, spyCar, enemyCar, general.points, time, fCar, eCar, sCar);
+							break;
+					}	
 					break;
 				case SDL_KEYUP:
-					if (event.key.keysym.sym == SDLK_LEFT && xSpeed == -1.0) xSpeed = 0;
-					else if (event.key.keysym.sym == SDLK_RIGHT && xSpeed == 1.0) xSpeed = 0;
+					if (event.key.keysym.sym == SDLK_LEFT && playerCar.xSpeed == -1.0) playerCar.xSpeed = 0;
+					else if (event.key.keysym.sym == SDLK_RIGHT && playerCar.xSpeed == 1.0) playerCar.xSpeed = 0;
 					break;
 				case SDL_QUIT:
-					quit = 1;
+					general.quit = 1;
 					break;
 				};
 			};
-		frames++;
 		};
 
-	// zwolnienie powierzchni / freeing all surfaces
+	// freeing all surfaces
 	SDL_FreeSurface(charset);
 	SDL_FreeSurface(screen);
 	SDL_DestroyTexture(scrtex);
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
-
 	SDL_Quit();
 	return 0;
 	};

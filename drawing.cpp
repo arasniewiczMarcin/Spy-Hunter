@@ -1,4 +1,5 @@
 #include"drawing.h"
+#include"game.h"
 
 
 // narysowanie napisu txt na powierzchni screen, zaczynaj¹c od punktu (x, y)
@@ -69,23 +70,111 @@ void DrawRectangle(SDL_Surface* screen, int x, int y, int l, int k,
 		DrawLine(screen, x + 1, i, l - 2, 1, 0, fillColor);
 };
 
-double getRoadLinesPosition(double speed, int lineNum, double &currentLinePosition, int lineHeight) {
-	if (currentLinePosition + speed + lineHeight > ROAD_DOWN_BORDER) {
-		currentLinePosition = ROAD_TOP_BORDER;
-		return currentLinePosition;
-	}
-	else return currentLinePosition + speed;
-}
 
 
 void drawRoadlines(SDL_Surface* screen, int x, double linesPosition[], int l, int k, Uint32 color) {
 	for (int counter = 0; counter < 5; counter++) {
-		//if (linesPosition[counter] < ROAD_TOP_BORDER) {
-			//int height = ROAD_TOP_BORDER + k - linesPosition[counter];
-			//DrawRectangle(screen, x, linesPosition[counter], l, height, color, color);
-		//}
 		DrawRectangle(screen, x, linesPosition[counter], l, k, color, color);
 	}
 		
+}
+void setColors(SDL_Surface* screen, int& black, int& gray) {
+	black = SDL_MapRGB(screen->format, 0x00, 0x00, 0x00);
+	gray = SDL_MapRGB(screen->format, 0x69, 0x69, 0x69);
+}
+void drawTexts(SDL_Surface* screen, SDL_Texture* scrtex, SDL_Renderer* renderer, SDL_Surface* charset, double worldTime, int points, char* text) {
+	//showing  my name and index number on the screen
+	sprintf(text, "Marcin Arasniewicz, 188857");
+	DrawString(screen, NAME_X_POSITION, NAME_Y_POSITION, text, charset);
+
+	//showing time and points on the screen
+	sprintf(text, "TIME: %.1lf s POINTS: %i", worldTime, points);
+	DrawString(screen, screen->w / 2 - strlen(text) * 8 / 2, POINTS_Y_POSITION, text, charset);
+
+	//showing implemented elements
+	sprintf(text, "a, b, c???, d, e, f, h");
+	DrawString(screen, SCREEN_WIDTH - 200, SCREEN_HEIGHT - 50, text, charset);
+
+	SDL_UpdateTexture(scrtex, NULL, screen->pixels, screen->pitch);
+	SDL_RenderCopy(renderer, scrtex, NULL, NULL);
+	SDL_RenderPresent(renderer);
+}
+
+void drawSpyCars(SDL_Surface* screen, objects spyCar[], double playerDistance, int time, SDL_Surface* spy) {
+	for (int i = 0; i < 5; i++) {
+		if (playerDistance - spyCar[i].distance >= 8000) {
+			spyCar[i].xPosition = getRandomCarX(time);
+			spyCar[i].distance += getRandomCarDistance(time);
+			spyCar[i].surface = spy;
+		}
+	}
+	for (int i = 0; i < 5; i++) {
+		if (playerDistance - spyCar[i].distance + PLAYER_Y_POSITION > MARGIN_UP_HEIGHT + CAR_HEIGHT / 2 &&
+			playerDistance - spyCar[i].distance + PLAYER_Y_POSITION < SCREEN_HEIGHT - MARGIN_DOWN_HEIGHT - CAR_HEIGHT / 2)
+			DrawSurface(screen, spyCar[i].surface, spyCar[i].xPosition, playerDistance - spyCar[i].distance + PLAYER_Y_POSITION);
+	}
+}
+
+void drawEnemyCars(SDL_Surface* screen, objects enemyCar[], double playerDistance, int time, SDL_Surface* enemy) {
+	for (int i = 0; i < 5; i++) {
+		if (playerDistance - enemyCar[i].distance >= 8000) {
+			enemyCar[i].xPosition = getRandomCarX(time);
+			enemyCar[i].distance += getRandomCarDistance(time);
+			enemyCar[i].surface = enemy;
+		}
+	}
+	for (int i = 0; i < 5; i++) {
+		if (playerDistance - enemyCar[i].distance + PLAYER_Y_POSITION > MARGIN_UP_HEIGHT + CAR_HEIGHT / 2 &&
+			playerDistance - enemyCar[i].distance + PLAYER_Y_POSITION < SCREEN_HEIGHT - MARGIN_DOWN_HEIGHT - CAR_HEIGHT / 2)
+			DrawSurface(screen, enemyCar[i].surface, enemyCar[i].xPosition, playerDistance - enemyCar[i].distance + PLAYER_Y_POSITION);
+	}
+}
+
+void drawFriendlyCars(SDL_Surface* screen, objects friendlyCar[], double playerDistance, int time, SDL_Surface* npc) {
+	for (int i = 0; i < 5; i++) {
+		if (playerDistance - friendlyCar[i].distance >= 8000) {
+			friendlyCar[i].surface = npc;
+			friendlyCar[i].xPosition = getRandomCarX(time);
+			friendlyCar[i].distance += getRandomCarDistance(time);
+		}
+	}
+	for (int i = 0; i < 5; i++) {
+		//if (playerDistance - friendlyCar[i].distance > MARGIN_UP_HEIGHT && playerDistance - friendlyCar[i].distance < SCREEN_HEIGHT - MARGIN_DOWN_HEIGHT * 2)
+		//zasieg to player distance + ROAD_HEIGHT
+		if (playerDistance - friendlyCar[i].distance + PLAYER_Y_POSITION > MARGIN_UP_HEIGHT + CAR_HEIGHT / 2 &&
+			playerDistance - friendlyCar[i].distance + PLAYER_Y_POSITION < SCREEN_HEIGHT - MARGIN_DOWN_HEIGHT - CAR_HEIGHT / 2)
+		DrawSurface(screen, friendlyCar[i].surface, friendlyCar[i].xPosition, playerDistance - friendlyCar[i].distance + PLAYER_Y_POSITION);
+	}
+
+
+}
+
+void drawTrees(SDL_Surface* screen, SDL_Surface* tree, int x, double playerDistance) {
+	int counter = 0;
+	int treeYPosition[4];
+	for (int i = MARGIN_UP_HEIGHT; i < ROAD_HEIGHT + MARGIN_UP_HEIGHT; i++) {
+		if ((i + (int)playerDistance) % DISTANCE_BETWEEN_TREES == 0 && 
+			ROAD_HEIGHT + MARGIN_UP_HEIGHT + MARGIN_DOWN_HEIGHT - i > MARGIN_UP_HEIGHT) {
+			treeYPosition[counter] = ROAD_HEIGHT + MARGIN_UP_HEIGHT + MARGIN_DOWN_HEIGHT - i;
+			counter++;
+		}
+	}
+	for (int i = 0; i < counter; i++) {
+		DrawSurface(screen, tree, x, treeYPosition[i]);
+		DrawSurface(screen, tree, SCREEN_WIDTH - x, treeYPosition[i]);
+	}
+	
+
+
+}
+
+void showStats(SDL_Surface* screen, SDL_Surface* charset, int xPlayerSpeed, int xPlayerPosition, double playerSpeed, double playerDistance, char* text) {
+	sprintf(text, "speed: %.1lf m/s", playerSpeed);
+	DrawString(screen, screen->w / 2 - strlen(text) * 8 / 2, NAME_Y_POSITION + 50, text, charset);
+
+	//showing time and points on the screen
+	sprintf(text, "distance %.1lf m", playerDistance);
+	DrawString(screen, screen->w / 2 - strlen(text) * 8 / 2, POINTS_Y_POSITION + 20, text, charset);
+
 }
  
