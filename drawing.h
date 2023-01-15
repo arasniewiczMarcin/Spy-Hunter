@@ -16,6 +16,7 @@ extern "C" {
 #define NAME_X_POSITION	10
 #define NAME_Y_POSITION	10
 #define POINTS_Y_POSITION 26
+#define TIME_LEFT_Y_POSITION 36
 #define X_VERTICAL_LINE 0
 #define Y_VERTICAL_LINE 1
 #define ROAD_LINE_SHIFT 120
@@ -29,6 +30,7 @@ extern "C" {
 #define CAR_WIDTH 48
 #define CAR_HEIGHT 69
 #define PLAYER_Y_POSITION 480
+#define BULLET_RANGE 300
 
 
 void DrawString(SDL_Surface* screen, int x, int y, const char* text,
@@ -52,10 +54,13 @@ void drawEnemyCars(SDL_Surface* screen, objects enemyCar[], double playerDistanc
 
 void setColors(SDL_Surface* screen, int& black, int& gray);
 
-void drawTexts(SDL_Surface* screen, SDL_Texture* scrtex, SDL_Renderer* renderer, SDL_Surface* charset, double worldTime, int points, char* text);
+void drawTexts(SDL_Surface* screen, SDL_Texture* scrtex, SDL_Renderer* renderer, SDL_Surface* charset, timeMeasuring time,
+	int points, char* text, double timeLeft, int carsLeft);
 
 void drawSpyCars(SDL_Surface* screen, objects spyCar[], double playerDistance, int time, SDL_Surface* spy);
 
 void drawTrees(SDL_Surface* screen, SDL_Surface* tree, int x, double playerDistance);
 
-void showStats(SDL_Surface* screen, SDL_Surface* charset, int xPlayerSpeed, int xPlayerPosition, double playerSpeed, double playerDistance, char* text);
+void shoot(SDL_Surface* screen, objects player, objects bullet[]);
+
+void drawGun(SDL_Surface* screen, objects& gun, double playerDistance, int time, SDL_Surface* gunS);

@@ -27,6 +27,7 @@ void DrawString(SDL_Surface* screen, int x, int y, const char* text,
 };
 
 
+
 // narysowanie na ekranie screen powierzchni sprite w punkcie (x, y)
 // (x, y) to punkt œrodka obrazka sprite na ekranie
 void DrawSurface(SDL_Surface* screen, SDL_Surface* sprite, int x, int y) {
@@ -82,18 +83,29 @@ void setColors(SDL_Surface* screen, int& black, int& gray) {
 	black = SDL_MapRGB(screen->format, 0x00, 0x00, 0x00);
 	gray = SDL_MapRGB(screen->format, 0x69, 0x69, 0x69);
 }
-void drawTexts(SDL_Surface* screen, SDL_Texture* scrtex, SDL_Renderer* renderer, SDL_Surface* charset, double worldTime, int points, char* text) {
+void drawTexts(SDL_Surface* screen, SDL_Texture* scrtex, SDL_Renderer* renderer, SDL_Surface* charset, timeMeasuring time,
+	int points, char* text, double timeLeft, int carsLeft) {
 	//showing  my name and index number on the screen
 	sprintf(text, "Marcin Arasniewicz, 188857");
 	DrawString(screen, NAME_X_POSITION, NAME_Y_POSITION, text, charset);
 
 	//showing time and points on the screen
-	sprintf(text, "TIME: %.1lf s POINTS: %i", worldTime, points);
+	sprintf(text, "TIME: %.1lf s POINTS: %i", time.worldTime, points);
 	DrawString(screen, screen->w / 2 - strlen(text) * 8 / 2, POINTS_Y_POSITION, text, charset);
 
+	//showing time left with unlimited amount of cars
+	if (time.timeLeft > 0)sprintf(text, "unlimited amount of cars for: %.1lf s", timeLeft);
+	else sprintf(text, "unlimited amount of cars for: 0 s");
+	DrawString(screen, screen->w / 2 - strlen(text) * 8 / 2, TIME_LEFT_Y_POSITION, text, charset);
+
+	//showing time left with unlimited amount of cars
+	if(time.timeLeft > 0)sprintf(text, "amount of cars: Nan");
+	else sprintf(text, "amount of cars: %i ", carsLeft);
+	DrawString(screen, screen->w / 2 - strlen(text) * 8 / 2, TIME_LEFT_Y_POSITION + 10, text, charset);
+
 	//showing implemented elements
-	sprintf(text, "a, b, c???, d, e, f, h");
-	DrawString(screen, SCREEN_WIDTH - 200, SCREEN_HEIGHT - 50, text, charset);
+	sprintf(text, "a, b, c, d, e, f, g, i, j, k, l, m, n");
+	DrawString(screen, SCREEN_WIDTH - 300, SCREEN_HEIGHT - 50, text, charset);
 
 	SDL_UpdateTexture(scrtex, NULL, screen->pixels, screen->pitch);
 	SDL_RenderCopy(renderer, scrtex, NULL, NULL);
@@ -106,6 +118,13 @@ void drawSpyCars(SDL_Surface* screen, objects spyCar[], double playerDistance, i
 			spyCar[i].xPosition = getRandomCarX(time);
 			spyCar[i].distance += getRandomCarDistance(time);
 			spyCar[i].surface = spy;
+			spyCar[i].speed = SPY_CARS_SPEED;
+		}
+		else if (spyCar[i].distance - playerDistance >= 10000) {
+			spyCar[i].surface = spy;
+			spyCar[i].xPosition = getRandomCarX(time);
+			spyCar[i].distance = playerDistance + getRandomCarDistanceInFrontOfPlayer(time);
+			spyCar[i].speed = SPY_CARS_SPEED;
 		}
 	}
 	for (int i = 0; i < 5; i++) {
@@ -121,6 +140,13 @@ void drawEnemyCars(SDL_Surface* screen, objects enemyCar[], double playerDistanc
 			enemyCar[i].xPosition = getRandomCarX(time);
 			enemyCar[i].distance += getRandomCarDistance(time);
 			enemyCar[i].surface = enemy;
+			enemyCar[i].speed = ENEMY_CARS_SPEED;
+		}
+		else if (enemyCar[i].distance - playerDistance >= 10000) {
+			enemyCar[i].surface = enemy;
+			enemyCar[i].xPosition = getRandomCarX(time);
+			enemyCar[i].distance = playerDistance + getRandomCarDistanceInFrontOfPlayer(time);
+			enemyCar[i].speed = ENEMY_CARS_SPEED;
 		}
 	}
 	for (int i = 0; i < 5; i++) {
@@ -136,17 +162,20 @@ void drawFriendlyCars(SDL_Surface* screen, objects friendlyCar[], double playerD
 			friendlyCar[i].surface = npc;
 			friendlyCar[i].xPosition = getRandomCarX(time);
 			friendlyCar[i].distance += getRandomCarDistance(time);
+			friendlyCar[i].speed = FRIENDLY_CARS_SPEED;
+		}
+		else if (friendlyCar[i].distance - playerDistance >= 10000) {
+			friendlyCar[i].surface = npc;
+			friendlyCar[i].xPosition = getRandomCarX(time);
+			friendlyCar[i].distance = playerDistance + getRandomCarDistanceInFrontOfPlayer(time);
+			friendlyCar[i].speed = FRIENDLY_CARS_SPEED;
 		}
 	}
 	for (int i = 0; i < 5; i++) {
-		//if (playerDistance - friendlyCar[i].distance > MARGIN_UP_HEIGHT && playerDistance - friendlyCar[i].distance < SCREEN_HEIGHT - MARGIN_DOWN_HEIGHT * 2)
-		//zasieg to player distance + ROAD_HEIGHT
 		if (playerDistance - friendlyCar[i].distance + PLAYER_Y_POSITION > MARGIN_UP_HEIGHT + CAR_HEIGHT / 2 &&
 			playerDistance - friendlyCar[i].distance + PLAYER_Y_POSITION < SCREEN_HEIGHT - MARGIN_DOWN_HEIGHT - CAR_HEIGHT / 2)
 		DrawSurface(screen, friendlyCar[i].surface, friendlyCar[i].xPosition, playerDistance - friendlyCar[i].distance + PLAYER_Y_POSITION);
 	}
-
-
 }
 
 void drawTrees(SDL_Surface* screen, SDL_Surface* tree, int x, double playerDistance) {
@@ -154,7 +183,7 @@ void drawTrees(SDL_Surface* screen, SDL_Surface* tree, int x, double playerDista
 	int treeYPosition[4];
 	for (int i = MARGIN_UP_HEIGHT; i < ROAD_HEIGHT + MARGIN_UP_HEIGHT; i++) {
 		if ((i + (int)playerDistance) % DISTANCE_BETWEEN_TREES == 0 && 
-			ROAD_HEIGHT + MARGIN_UP_HEIGHT + MARGIN_DOWN_HEIGHT - i > MARGIN_UP_HEIGHT) {
+			ROAD_HEIGHT + MARGIN_UP_HEIGHT + MARGIN_DOWN_HEIGHT - i > MARGIN_UP_HEIGHT + 45) {
 			treeYPosition[counter] = ROAD_HEIGHT + MARGIN_UP_HEIGHT + MARGIN_DOWN_HEIGHT - i;
 			counter++;
 		}
@@ -167,14 +196,33 @@ void drawTrees(SDL_Surface* screen, SDL_Surface* tree, int x, double playerDista
 
 
 }
-
-void showStats(SDL_Surface* screen, SDL_Surface* charset, int xPlayerSpeed, int xPlayerPosition, double playerSpeed, double playerDistance, char* text) {
-	sprintf(text, "speed: %.1lf m/s", playerSpeed);
-	DrawString(screen, screen->w / 2 - strlen(text) * 8 / 2, NAME_Y_POSITION + 50, text, charset);
-
-	//showing time and points on the screen
-	sprintf(text, "distance %.1lf m", playerDistance);
-	DrawString(screen, screen->w / 2 - strlen(text) * 8 / 2, POINTS_Y_POSITION + 20, text, charset);
+ 
+void shoot(SDL_Surface* screen, objects player, objects bullet[]) {
+	if (bullet[0].carsLeft > 0) {
+		if (bullet[0].distance > player.distance + BULLET_RANGE + 75) {
+			bullet[0].distance = -1000;
+			bullet[0].speed = 0;
+		}
+	}
+	else if (bullet[0].distance > player.distance + BULLET_RANGE) {
+		bullet[0].distance = -1000;
+		bullet[0].speed = 0;
+	}
+	if (player.distance - bullet[0].distance + PLAYER_Y_POSITION > MARGIN_UP_HEIGHT &&
+		player.distance - bullet[0].distance + PLAYER_Y_POSITION < SCREEN_HEIGHT - MARGIN_DOWN_HEIGHT) {
+		DrawSurface(screen, bullet[0].surface, bullet[0].xPosition, player.distance - bullet[0].distance + PLAYER_Y_POSITION);
+	}
 
 }
- 
+
+void drawGun(SDL_Surface* screen, objects& gun, double playerDistance, int time, SDL_Surface* gunS) {
+		if (playerDistance - gun.distance >= 5000) {
+			gun.xPosition = getRandomCarX(time);
+			gun.distance += 10000;
+			gun.surface = gunS;
+			gun.speed = 0;
+		}
+		if (playerDistance - gun.distance + PLAYER_Y_POSITION > MARGIN_UP_HEIGHT + CAR_HEIGHT / 2 &&
+			playerDistance - gun.distance + PLAYER_Y_POSITION < SCREEN_HEIGHT - MARGIN_DOWN_HEIGHT - CAR_HEIGHT / 2)
+			DrawSurface(screen, gun.surface, gun.xPosition, playerDistance - gun.distance + PLAYER_Y_POSITION);
+}
